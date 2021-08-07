@@ -318,7 +318,7 @@ public class VideobridgeStatistics
                 TransceiverStats transceiverStats = endpoint.getTransceiver().getTransceiverStats();
                 IncomingStatisticsSnapshot incomingStats = transceiverStats.getIncomingStats();
                 PacketStreamStats.Snapshot incomingPacketStreamStats = transceiverStats.getIncomingPacketStreamStats();
-                bitrateDownloadBps += incomingPacketStreamStats.getBitrate();
+                bitrateDownloadBps += incomingPacketStreamStats.getBitrateBps();
                 packetRateDownload += incomingPacketStreamStats.getPacketRate();
                 for (IncomingSsrcStats.Snapshot ssrcStats : incomingStats.getSsrcStats().values())
                 {
@@ -333,7 +333,7 @@ public class VideobridgeStatistics
                 }
 
                 PacketStreamStats.Snapshot outgoingStats = transceiverStats.getOutgoingPacketStreamStats();
-                bitrateUploadBps += outgoingStats.getBitrate();
+                bitrateUploadBps += outgoingStats.getBitrateBps();
                 packetRateUpload += outgoingStats.getPacketRate();
 
                 EndpointConnectionStats.Snapshot endpointConnectionStats
@@ -537,6 +537,7 @@ public class VideobridgeStatistics
             unlockedSetStat(
                     TOTAL_PACKETS_RECEIVED, jvbStats.totalPacketsReceived.get());
             unlockedSetStat(TOTAL_PACKETS_SENT, jvbStats.totalPacketsSent.get());
+            unlockedSetStat("tossedPacketsEnergy", jvbStats.tossedPacketsEnergy.toJson());
 
             OctoRelayService.Stats octoRelayServiceStats
                 = octoRelayService == null ? null : octoRelayService.getStats();

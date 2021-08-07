@@ -798,7 +798,7 @@ class Endpoint @JvmOverloads constructor(
     fun getMostRecentChannelCreatedTime(): Instant {
         return channelShims
             .map(ChannelShim::getCreationTimestamp)
-            .max() ?: NEVER
+            .maxOrNull() ?: NEVER
     }
 
     override fun receivesSsrc(ssrc: Long): Boolean = transceiver.receivesSsrc(ssrc)
@@ -862,7 +862,7 @@ class Endpoint @JvmOverloads constructor(
         val maxExpireTimeFromChannelShims = channelShims
             .map(ChannelShim::getExpire)
             .map { Duration.ofSeconds(it.toLong()) }
-            .max() ?: Duration.ZERO
+            .maxOrNull() ?: Duration.ZERO
 
         val lastActivity = lastIncomingActivity
         val now = clock.instant()
@@ -932,10 +932,14 @@ class Endpoint @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Determine whether to forward endpoint stats from another endpoint to this one.
+     */
     fun wantsStatsFrom(ep: AbstractEndpoint): Boolean {
         return conference.speechActivity.isRecentSpeaker(ep) ||
+            conference.isRankedSpeaker(ep) ||
             bitrateController.isOnStageOrSelected(ep) ||
-            bitrateController.isForwarding(ep)
+            bitrateController.hasNonZeroEffectiveConstraints(ep)
     }
 
     /**
