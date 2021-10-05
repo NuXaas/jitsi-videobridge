@@ -18,10 +18,12 @@ package org.jitsi.videobridge.cc.allocation
 
 import io.kotest.assertions.withClue
 import io.kotest.core.spec.IsolationMode
+import io.kotest.core.spec.Spec
 import io.kotest.core.spec.style.ShouldSpec
 import io.kotest.matchers.collections.shouldContainInOrder
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import org.jitsi.config.setNewConfig
 import org.jitsi.nlj.MediaSourceDesc
 import org.jitsi.nlj.PacketInfo
 import org.jitsi.nlj.RtpEncodingDesc
@@ -47,11 +49,23 @@ class BitrateControllerTest : ShouldSpec() {
 
     private val logger = createLogger()
     private val clock = FakeClock()
-    private val bc = BitrateControllerWrapper("A", "B", "C", "D", clock = clock)
-    private val A: Endpoint = bc.endpoints.find { it.id == "A" }!!
-    private val B: Endpoint = bc.endpoints.find { it.id == "B" }!!
-    private val C: Endpoint = bc.endpoints.find { it.id == "C" }!!
-    private val D: Endpoint = bc.endpoints.find { it.id == "D" }!!
+    private val bc = BitrateControllerWrapper(createEndpoints("A", "B", "C", "D"), clock = clock)
+    private val A: TestEndpoint = bc.endpoints.find { it.id == "A" }!! as TestEndpoint
+    private val B: TestEndpoint = bc.endpoints.find { it.id == "B" }!! as TestEndpoint
+    private val C: TestEndpoint = bc.endpoints.find { it.id == "C" }!! as TestEndpoint
+    private val D: TestEndpoint = bc.endpoints.find { it.id == "D" }!! as TestEndpoint
+
+    /**
+     * We disable the threshold, causing [BandwidthAllocator] to make a new decision every time BWE changes. This is
+     * because these tests are designed to test the decisions themselves and not necessariry when they are made.
+     */
+    override fun beforeSpec(spec: Spec) = super.beforeSpec(spec).also {
+        setNewConfig("videobridge.cc.bwe-change-threshold=0", true)
+    }
+
+    override fun afterSpec(spec: Spec) = super.afterSpec(spec).also {
+        setNewConfig("", true)
+    }
 
     init {
         context("Prioritization") {
@@ -1352,8 +1366,8 @@ fun List<Event<BandwidthAllocation>>.shouldMatchInOrder(vararg events: Event<Ban
 fun BandwidthAllocation.shouldMatch(other: BandwidthAllocation) {
     allocations.size shouldBe other.allocations.size
     allocations.forEach { thisSingleAllocation ->
-        withClue("Allocation for ${thisSingleAllocation.endpoint.id}") {
-            val otherSingleAllocation = other.allocations.find { it.endpoint == thisSingleAllocation.endpoint }
+        withClue("Allocation for ${thisSingleAllocation.endpointId}") {
+            val otherSingleAllocation = other.allocations.find { it.endpointId == thisSingleAllocation.endpointId }
             otherSingleAllocation.shouldNotBeNull()
             thisSingleAllocation.targetLayer?.height shouldBe otherSingleAllocation.targetLayer?.height
             thisSingleAllocation.targetLayer?.frameRate shouldBe otherSingleAllocation.targetLayer?.frameRate
@@ -1361,8 +1375,8 @@ fun BandwidthAllocation.shouldMatch(other: BandwidthAllocation) {
     }
 }
 
-private class BitrateControllerWrapper(vararg endpointIds: String, val clock: FakeClock = FakeClock()) {
-    var endpoints: List<Endpoint> = createEndpoints(*endpointIds)
+class BitrateControllerWrapper(initialEndpoints: List<MediaSourceContainer>, val clock: FakeClock = FakeClock()) {
+    var endpoints: List<MediaSourceContainer> = initialEndpoints
     val logger = createLogger()
 
     var bwe = (-1).bps
@@ -1415,7 +1429,7 @@ private class BitrateControllerWrapper(vararg endpointIds: String, val clock: Fa
         clock
     )
 
-    fun setEndpointOrdering(vararg endpoints: Endpoint) {
+    fun setEndpointOrdering(vararg endpoints: TestEndpoint) {
         logger.info("Set endpoints ${endpoints.map{ it.id }.joinToString(",")}")
         this.endpoints = endpoints.toList()
         bc.endpointOrderingChanged()
@@ -1486,15 +1500,15 @@ data class Event<T>(
     }
 }
 
-class Endpoint(
+class TestEndpoint(
     override val id: String,
     override val mediaSource: MediaSourceDesc? = null,
     override var videoType: VideoType = VideoType.CAMERA
 ) : MediaSourceContainer
 
-fun createEndpoints(vararg ids: String): MutableList<Endpoint> {
+fun createEndpoints(vararg ids: String): MutableList<TestEndpoint> {
     return MutableList(ids.size) { i ->
-        Endpoint(
+        TestEndpoint(
             ids[i],
             createSource(
                 3 * i + 1,
@@ -1518,29 +1532,33 @@ val bitrateSd = 500.kbps
 val bitrateHd = 2000.kbps
 
 val ld7_5
-    get() = createLayer(tid = 0, eid = 0, height = 180, frameRate = 7.5, bitrate = bitrateLd * 0.33)
+    get() = MockRtpLayerDesc(tid = 0, eid = 0, height = 180, frameRate = 7.5, bitrate = bitrateLd * 0.33)
 val ld15
-    get() = createLayer(tid = 1, eid = 0, height = 180, frameRate = 15.0, bitrate = bitrateLd * 0.66)
+    get() = MockRtpLayerDesc(tid = 1, eid = 0, height = 180, frameRate = 15.0, bitrate = bitrateLd * 0.66)
 val ld30
-    get() = createLayer(tid = 2, eid = 0, height = 180, frameRate = 30.0, bitrate = bitrateLd)
+    get() = MockRtpLayerDesc(tid = 2, eid = 0, height = 180, frameRate = 30.0, bitrate = bitrateLd)
 
 val sd7_5
-    get() = createLayer(tid = 0, eid = 1, height = 360, frameRate = 7.5, bitrate = bitrateSd * 0.33)
+    get() = MockRtpLayerDesc(tid = 0, eid = 1, height = 360, frameRate = 7.5, bitrate = bitrateSd * 0.33)
 val sd15
-    get() = createLayer(tid = 1, eid = 1, height = 360, frameRate = 15.0, bitrate = bitrateSd * 0.66)
+    get() = MockRtpLayerDesc(tid = 1, eid = 1, height = 360, frameRate = 15.0, bitrate = bitrateSd * 0.66)
 val sd30
-    get() = createLayer(tid = 2, eid = 1, height = 360, frameRate = 30.0, bitrate = bitrateSd)
+    get() = MockRtpLayerDesc(tid = 2, eid = 1, height = 360, frameRate = 30.0, bitrate = bitrateSd)
 
 val hd7_5
-    get() = createLayer(tid = 0, eid = 2, height = 720, frameRate = 7.5, bitrate = bitrateHd * 0.33)
+    get() = MockRtpLayerDesc(tid = 0, eid = 2, height = 720, frameRate = 7.5, bitrate = bitrateHd * 0.33)
 val hd15
-    get() = createLayer(tid = 1, eid = 2, height = 720, frameRate = 15.0, bitrate = bitrateHd * 0.66)
+    get() = MockRtpLayerDesc(tid = 1, eid = 2, height = 720, frameRate = 15.0, bitrate = bitrateHd * 0.66)
 val hd30
-    get() = createLayer(tid = 2, eid = 2, height = 720, frameRate = 30.0, bitrate = bitrateHd)
+    get() = MockRtpLayerDesc(tid = 2, eid = 2, height = 720, frameRate = 30.0, bitrate = bitrateHd)
 
 val noVideo: RtpLayerDesc? = null
 
-fun createLayer(
+/**
+ * An [RtpLayerDesc] whose bitrate can be set externally. We inherit directly from [RtpLayerDesc], because mocking with
+ * mockk absolutely kills the performance.
+ */
+class MockRtpLayerDesc(
     tid: Int,
     eid: Int,
     height: Int,
@@ -1548,13 +1566,10 @@ fun createLayer(
     /**
      * Note: this mock impl does not model the dependency layers, so the cumulative bitrate should be provided.
      */
-    bitrate: Bandwidth,
+    var bitrate: Bandwidth,
     sid: Int = -1
-): RtpLayerDesc {
+) : RtpLayerDesc(eid, tid, sid, height, frameRate) {
 
-    // Use a real RtpLayerDesc, because mocking absolutely kills the performance.
-    return object : RtpLayerDesc(eid, tid, sid, height, frameRate) {
-        override fun getBitrate(nowMs: Long): Bandwidth = bitrate
-        override fun hasZeroBitrate(nowMs: Long): Boolean = bitrate == 0.bps
-    }
+    override fun getBitrate(nowMs: Long): Bandwidth = bitrate
+    override fun hasZeroBitrate(nowMs: Long): Boolean = bitrate == 0.bps
 }

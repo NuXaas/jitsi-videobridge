@@ -31,7 +31,7 @@ import org.jitsi.xmpp.mucclient.MucClientManager
 import org.jitsi.xmpp.util.IQUtils
 import org.jivesoftware.smack.packet.ExtensionElement
 import org.jivesoftware.smack.packet.IQ
-import org.jivesoftware.smack.packet.XMPPError
+import org.jivesoftware.smack.packet.StanzaError
 import org.jivesoftware.smackx.iqversion.packet.Version
 import org.json.simple.JSONArray
 import org.json.simple.JSONObject
@@ -181,7 +181,7 @@ class XmppConnection : IQListener {
     private fun handleIqRequest(iq: IQ, mucClient: MucClient): IQ? {
         val handler = eventHandler ?: return IQUtils.createError(
             iq,
-            XMPPError.Condition.service_unavailable,
+            StanzaError.Condition.service_unavailable,
             "Service unavailable"
         )
         val response = when (iq) {
@@ -192,8 +192,9 @@ class XmppConnection : IQListener {
                 // Colibri IQs are handled async.
                 handler.colibriConferenceIqReceived(
                     ColibriRequest(iq, colibriDelayStats, colibriProcessingDelayStats) { response ->
+                        response.setResponseTo(iq)
                         logger.debug { "SENT: ${response.toXML()}" }
-                        mucClient.sendStanza(response.setResponseTo(iq))
+                        mucClient.sendStanza(response)
                     }
                 )
                 null
@@ -203,7 +204,7 @@ class XmppConnection : IQListener {
             }
             else -> IQUtils.createError(
                 iq,
-                XMPPError.Condition.service_unavailable,
+                StanzaError.Condition.service_unavailable,
                 "Unsupported IQ request ${iq.childElementName}"
             )
         }

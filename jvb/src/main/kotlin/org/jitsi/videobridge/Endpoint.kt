@@ -338,6 +338,11 @@ class Endpoint @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Whether this endpoint has any endpoints "on-stage".
+     */
+    fun isInStageView() = bitrateController.allocationSettings.onStageEndpoints.isNotEmpty()
+
     private fun setupDtlsTransport() {
         dtlsTransport.incomingDataHandler = object : DtlsTransport.IncomingDataHandler {
             override fun dtlsAppDataReceived(buf: ByteArray, off: Int, len: Int) {
@@ -809,6 +814,7 @@ class Endpoint @JvmOverloads constructor(
 
     override fun requestKeyframe(mediaSsrc: Long) = transceiver.requestKeyFrame(mediaSsrc)
 
+    /** Whether we are currently oversending to this endpoint. */
     fun isOversending(): Boolean = bitrateController.isOversending()
 
     fun setSelectedEndpoints(selectedEndpoints: List<String>) =

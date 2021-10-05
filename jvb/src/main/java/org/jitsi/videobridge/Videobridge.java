@@ -361,7 +361,7 @@ public class Videobridge
         {
             return IQUtils.createError(
                     conferenceIq,
-                    XMPPError.Condition.bad_request,
+                    StanzaError.Condition.bad_request,
                     "Conference not found for ID: " + conferenceIq.getID());
         }
         catch (InGracefulShutdownException e)
@@ -388,7 +388,7 @@ public class Videobridge
             request.getCallback().invoke(
                     IQUtils.createError(
                             conferenceIq,
-                            XMPPError.Condition.bad_request,
+                            StanzaError.Condition.bad_request,
                             "Conference not found for ID: " + conferenceIq.getID()));
             return;
         }
@@ -436,8 +436,8 @@ public class Videobridge
      * @param healthCheckIQ the <tt>HealthCheckIQ</tt> to be handled.
      * @return IQ with &quot;result&quot; type if the health check succeeded or
      * IQ with &quot;error&quot; type if something went wrong.
-     * {@link XMPPError.Condition#internal_server_error} is returned when the
-     * health check fails or {@link XMPPError.Condition#not_authorized} if the
+     * {@link StanzaError.Condition#internal_server_error} is returned when the
+     * health check fails or {@link StanzaError.Condition#not_authorized} if the
      * request comes from a JID that is not authorized to do health checks on
      * this instance.
      */
@@ -453,7 +453,7 @@ public class Videobridge
             return
                 IQUtils.createError(
                         healthCheckIQ,
-                        XMPPError.Condition.internal_server_error,
+                        StanzaError.Condition.internal_server_error,
                         e.getMessage());
         }
     }
@@ -917,6 +917,13 @@ public class Videobridge
         /** Distribution of energy scores for discarded audio packets  */
         public BucketStats tossedPacketsEnergy = new BucketStats(
                 LongStream.range(1, 16).map(w -> 8 * w - 1).toArray(), "", "");
+
+        /** Number of preemptive keyframe requests that were sent. */
+        public AtomicInteger preemptiveKeyframeRequestsSent = new AtomicInteger();
+
+        /** Number of preemptive keyframe requests that were not sent because no endpoints were in stage view. */
+        public AtomicInteger preemptiveKeyframeRequestsSuppressed = new AtomicInteger();
+
     }
 
     public interface EventHandler {

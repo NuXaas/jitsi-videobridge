@@ -74,11 +74,16 @@ internal class SingleSourceAllocation(
      * bandwidth. Note that this works eagerly up until the "preferred" layer (if any), and as a single step from
      * then on.
      *
-     * @param maxBps the bandwidth available.
+     * @param remainingBps the additional bandwidth which is available on top of the bitrate of the current target
+     * layer.
+     * @return the bandwidth "consumed" by the method, i.e. the difference between the resulting and initial target
+     * bitrate. E.g. if the target bitrate goes from 100 to 300 as a result if the method call, it will return 200.
      */
-    fun improve(maxBps: Long, allowOversending: Boolean) {
+    fun improve(remainingBps: Long, allowOversending: Boolean): Long {
+        val initialTargetBitrate = targetBitrate
+        val maxBps = remainingBps + initialTargetBitrate
         if (layers.isEmpty()) {
-            return
+            return 0
         }
         if (targetIdx == -1 && layers.preferredIndex > -1 && onStage) {
             // Boost on stage participant to preferred, if there's enough bw.
@@ -119,6 +124,9 @@ internal class SingleSourceAllocation(
                 }
             }
         }
+
+        val resultingTargetBitrate = targetBitrate
+        return resultingTargetBitrate - initialTargetBitrate
     }
 
     /**
@@ -141,6 +149,13 @@ internal class SingleSourceAllocation(
         get() = layers.getOrNull(targetIdx)
 
     /**
+     * Gets the ideal bitrate (in bps) for this endpoint allocation, i.e. the bitrate of the layer the bridge would
+     * forward if there were no (bandwidth) constraints.
+     */
+    val idealBitrate: Long
+        get() = layers.idealLayer?.bitrate?.toLong() ?: 0
+
+    /**
      * Exposed for testing only.
      */
     val preferredLayer: RtpLayerDesc?
@@ -158,7 +173,8 @@ internal class SingleSourceAllocation(
      */
     val result: SingleAllocation
         get() = SingleAllocation(
-            endpoint,
+            endpoint.id,
+            endpoint.mediaSource,
             targetLayer?.layer,
             layers.idealLayer?.layer
         )

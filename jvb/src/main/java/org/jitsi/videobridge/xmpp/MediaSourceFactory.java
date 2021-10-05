@@ -21,6 +21,7 @@ import org.jitsi.utils.logging2.*;
 import org.jitsi.xmpp.extensions.colibri.*;
 import org.jitsi.xmpp.extensions.jingle.*;
 import org.jitsi.xmpp.extensions.jitsimeet.*;
+import org.jivesoftware.smack.packet.*;
 import org.jxmpp.jid.parts.*;
 import org.jxmpp.util.*;
 
@@ -394,11 +395,12 @@ public class MediaSourceFactory
             });
         });
 
-        if (!sourceGroupsCopy.isEmpty()) {
+        if (!sourceGroupsCopy.isEmpty())
+        {
             logger.warn(
                 "Unprocessed source groups: " +
                     sourceGroupsCopy.stream()
-                        .map(SourceGroupPacketExtension::toXML)
+                        .map(e -> e.toXML(XmlEnvironment.EMPTY))
                         .reduce(String::concat));
         }
 
@@ -423,7 +425,7 @@ public class MediaSourceFactory
             }
         });
 
-        setOwners(sources, sourceSsrcsList);
+        setOwnersAndNames(sources, sourceSsrcsList);
 
         return sourceSsrcsList;
     }
@@ -437,7 +439,7 @@ public class MediaSourceFactory
      * list or the objects in the list will not be modified.
      * @param sourceSsrcsList the list of {@link SourceSsrcs} to update.
      */
-    private static void setOwners(
+    private static void setOwnersAndNames(
         Collection<SourcePacketExtension> sources,
         Collection<SourceSsrcs> sourceSsrcsList)
     {
@@ -453,6 +455,7 @@ public class MediaSourceFactory
                     .findAny().orElse(null);
 
             sourceSsrcs.owner = getOwner(sourceSource);
+            sourceSsrcs.name = sourceSource != null ? sourceSource.getName() : null;
         }
     }
 
@@ -636,6 +639,8 @@ public class MediaSourceFactory
     private static class SourceSsrcs
         implements Iterable<Long>
     {
+        private String name;
+
         private List<Long> sourceSsrcs;
 
         private String owner;
@@ -734,7 +739,7 @@ public class MediaSourceFactory
             height *= 2;
         }
 
-        MediaSourceDesc source = new MediaSourceDesc(encodings, primarySsrcs.owner);
+        MediaSourceDesc source = new MediaSourceDesc(encodings, primarySsrcs.owner, primarySsrcs.name);
 
         return source;
     }
